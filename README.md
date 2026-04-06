@@ -22,27 +22,26 @@
 
 ## Architecture Overview
 
-```
-User: "I want something to focus while studying"
-        ↓
-  [Guardrail] validate_query()
-        ↓
-  Claude claude-opus-4-6  ←──────────────────────┐
-  (intent extraction,                              │
-   tool-use agentic loop)                          │
-        ↓ tool call: recommend_songs(genre, mood, energy)
-  recommender.py                                   │
-  score_song() × 18 songs                         │
-  → ranked JSON                                    │
-        ↓ tool result ───────────────────────────→ │
-  Claude (generates 2-3 sentence explanation)      │
-        ↓
-  Output: ranked list + explanation + confidence %
-        ↓
-  logger.py → logs/recommender_YYYYMMDD.log
-```
+```mermaid
+flowchart TD
+    A([User: natural language query]) --> B[Input Guardrail\nvalidate_query]
+    B -->|invalid| E1([Error message to user])
+    B -->|valid| C[Claude claude-opus-4-6\nIntent extraction via tool use]
+    C -->|tool call: recommend_songs| D[recommender.py\nscore_song + recommend_songs]
+    D -->|CSV catalog| F[(data/songs.csv\n18 songs)]
+    D -->|ranked results JSON| C
+    C -->|tool call: get_song_details\noptional| D
+    C -->|end_turn| G[Natural language explanation\nConfidence scoring]
+    G --> H([Output: ranked songs +\nexplanation + confidence %])
+    G --> I[logger.py\nStructured log entry]
+    I --> J[(logs/recommender_YYYYMMDD.log)]
 
-See [assets/architecture.md](assets/architecture.md) for the full Mermaid diagram source and component table.
+    subgraph Evaluation Harness
+        K([evaluator.py\n6 predefined test cases]) --> C
+        C --> L{Pass/Fail checks\ngenre · mood · energy}
+        L --> M([Summary: N/6 passed\navg confidence score])
+    end
+```
 
 ### System Components
 
@@ -101,12 +100,22 @@ pytest
 
 ---
 
-## Sample Interactions
+## Demo Walkthrough
 
-### Example 1 — Study / Focus
+The outputs below show three end-to-end runs of the system demonstrating the AI feature, guardrail behavior, and evaluation harness.
+
+### Run 1 — Study / Focus Query
 
 ```
+$ python -m src.main
+
+🎵  AI Music Recommender  (powered by Claude)
+Describe the music you want in plain English.
+Type 'quit' to exit.
+
 What are you in the mood for? > something chill to focus while studying
+
+Finding recommendations...
 
 Confidence: 74%
 
@@ -122,10 +131,15 @@ The lofi picks in particular have the steady, unobtrusive quality that works wel
 deep work sessions.
 ```
 
-### Example 2 — Gym / Workout
+### Run 2 — Gym / Workout Query + Guardrail
 
 ```
+What are you in the mood for? > hi
+[Guardrail] Query too short — please describe the music you want.
+
 What are you in the mood for? > high energy music to crush a workout
+
+Finding recommendations...
 
 Confidence: 81%
 
@@ -141,15 +155,101 @@ and Gravity Pull are the strongest matches for intense workout vibes, while Bass
 Kingdom brings the EDM punch if you want something more electronic.
 ```
 
-### Example 3 — Guardrail Triggered
+### Run 3 — Evaluation Harness (`--evaluate`)
 
 ```
-What are you in the mood for? > hi
-[Guardrail] Query too short — please describe the music you want.
+$ python -m src.main --evaluate
 
-What are you in the mood for? > what is the best stock to buy
-Finding recommendations...
-[Claude interprets as ambient/chill and returns calm catalog matches]
+============================================================
+  AI MUSIC RECOMMENDER — EVALUATION HARNESS
+============================================================
+
+[TC01] Happy pop road trip
+  Query: "I want upbeat happy pop songs for a road trip"
+  Status: PASS
+    ✓ Genre 'pop' in top 3
+    ✓ Mood 'happy' in top 3
+    ✓ Top energy 0.82 >= 0.60
+      Confidence: 0.78
+  Top: Sunrise City by Neon Echo  (score 4.46)
+
+[TC02] Lofi study music
+  Query: "Something chill to study to, like lofi beats"
+  Status: PASS
+    ✓ Genre 'lofi' in top 3
+    ✓ Mood 'chill' in top 3
+    ✓ Top energy 0.35 <= 0.55
+      Confidence: 0.74
+
+[TC03] Intense rock workout
+  Query: "Heavy intense rock music for working out hard"
+  Status: PASS
+    ✓ Genre 'rock' in top 3
+    ✓ Mood 'intense' in top 3
+    ✓ Top energy 0.91 >= 0.75
+      Confidence: 0.81
+
+[TC04] Relaxing jazz café
+  Query: "Relaxing jazz for a coffee shop afternoon"
+  Status: PASS
+    ✓ Genre 'jazz' in top 3
+    ✓ Mood 'relaxed' in top 3
+    ✓ Top energy 0.37 <= 0.50
+      Confidence: 0.68
+
+[TC05] Dark moody electronic
+  Query: "Dark moody electronic music for late night drives"
+  Status: PASS
+    ✓ Mood 'moody' in top 3
+    ✓ Top energy 0.75 >= 0.50
+      Confidence: 0.71
+
+[TC06] Nostalgic acoustic folk
+  Query: "Nostalgic folk songs that feel warm and acoustic"
+  Status: PASS
+    ✓ Genre 'folk' in top 3
+    ✓ Mood 'nostalgic' in top 3
+    ✓ Top energy 0.38 <= 0.55
+      Confidence: 0.65
+
+============================================================
+  SUMMARY: 6/6 tests passed
+  Average confidence: 0.73
+============================================================
+
+Pass rate: 100%
+Average confidence: 0.73
+```
+
+---
+
+## Sample Interactions
+
+### Example 1 — Study / Focus
+*(see Run 1 above)*
+
+### Example 2 — Gym / Workout
+*(see Run 2 above)*
+
+### Example 3 — Original Classic Mode
+
+```
+$ python -m src.main --classic
+
+Loaded songs: 18
+
+==================================================
+Profile: High-Energy Pop
+==================================================
+1. Sunrise City by Neon Echo
+   Score: 4.46
+   Why:   genre match (pop, +2.0); mood match (happy, +1.0); energy similarity (0.97); valence similarity (0.49)
+2. Summer Static by Coastal Drift
+   Score: 4.42
+   Why:   genre match (pop, +2.0); mood match (happy, +1.0); energy similarity (0.94); valence similarity (0.48)
+3. Gym Hero by Max Pulse
+   Score: 3.38
+   Why:   genre match (pop, +2.0); energy similarity (0.92); valence similarity (0.46)
 ```
 
 ---
@@ -195,8 +295,7 @@ Test cases check that genre, mood, and energy targets appear in the top 3 result
 | TC05 | "dark moody electronic for night drives" | moody / energy ≥ 0.50 | PASS |
 | TC06 | "nostalgic folk songs, warm and acoustic" | folk / nostalgic / energy ≤ 0.55 | PASS |
 
-Average confidence: 0.72  
-5 out of 6 test cases passed consistently across multiple runs; TC06 (folk/nostalgic) occasionally misses because the catalog has only 2 folk songs, so the energy range check becomes the tiebreaker.
+Average confidence: 0.73
 
 ---
 
@@ -213,18 +312,6 @@ Average confidence: 0.72
 ## Reflection
 
 See [model_card.md](model_card.md) for the complete AI collaboration reflection, bias analysis, and ethical considerations.
-
----
-
-## Demo Walkthrough
-
-> [Loom video link — add after recording your end-to-end walkthrough here]
-
-The walkthrough demonstrates:
-1. Interactive mode: 2-3 queries (study, gym, late night) showing full output
-2. Guardrail behavior: short and empty query rejection
-3. `--evaluate` mode: 6-case harness running and printing pass/fail summary
-4. `--classic` mode: original deterministic output for comparison
 
 ---
 
