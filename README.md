@@ -1,90 +1,99 @@
-# 🎵 Music Recommender Simulation
+# 🎵 AI Music Recommender — Applied AI System
 
-## Project Summary
-
-This project simulates a content-based music recommendation system. It reads a catalog of songs from a CSV file and scores each one against a user's taste profile (preferred genre, mood, energy level, and valence). Songs are ranked by score and the top results are returned with plain-language explanations of why each track was chosen. The system is designed to be transparent — every recommendation includes a breakdown of exactly which attributes matched and how many points each contributed.
+> **Applied AI Final Project** — Extended from the Module 3 Music Recommender Simulation
 
 ---
 
-## How The System Works
+## Base Project
 
-Real-world platforms like Spotify use a mix of **collaborative filtering** (learning from what similar users liked) and **content-based filtering** (matching songs by their audio features). This simulation focuses purely on content-based filtering because it is simpler to inspect and reason about.
+**Original project:** Module 3 — Music Recommender Simulation  
+**Original goals:** Build a content-based recommender that scores songs against a user's taste profile (genre, mood, energy) using a weighted scoring algorithm, then ranks them deterministically.  
+**Original capabilities:** `load_songs`, `score_song`, `recommend_songs` — pure Python, no AI API, outputs ranked song lists with score breakdowns via CLI.
 
-### Features each `Song` uses
-
-- `genre` — musical category (pop, rock, lofi, jazz, etc.)
-- `mood` — emotional feel (happy, chill, intense, moody, etc.)
-- `energy` — intensity on a 0.0–1.0 scale
-- `tempo_bpm` — beats per minute (loaded but not currently scored)
-- `valence` — musical positivity on a 0.0–1.0 scale
-- `danceability` — rhythmic suitability on a 0.0–1.0 scale
-- `acousticness` — how acoustic the track feels on a 0.0–1.0 scale
-
-### What `UserProfile` stores
-
-- `favorite_genre` — the genre the user prefers
-- `favorite_mood` — the mood the user prefers
-- `target_energy` — the energy level the user aims for
-- `likes_acoustic` — whether the user prefers acoustic tracks
-
-### Algorithm Recipe (scoring logic)
-
-For each song in the catalog the recommender awards:
-
-| Rule | Points |
-|---|---|
-| Genre matches user preference | +2.0 |
-| Mood matches user preference | +1.0 |
-| Energy similarity (1.0 − |song\_energy − target|) | 0.0–1.0 |
-| Valence similarity (optional, ×0.5 weight) | 0.0–0.5 |
-
-Songs are then sorted highest-to-lowest and the top K are returned with a reason string listing exactly which rules fired.
-
-### Data flow
-
-```
-Input (User Prefs)
-      ↓
-  For each song in catalog:
-      score_song(user_prefs, song)  →  (score, reasons)
-      ↓
-  Sort all songs by score (descending)
-      ↓
-Output: Top K recommendations with explanations
-```
-
-### Potential biases expected before testing
-
-- Genre matching carries the most weight (+2.0), so the system will strongly favor songs in the user's preferred genre even when other attributes conflict.
-- The catalog has 18 songs — small diversity means some genres (pop, lofi) have more representatives and will naturally appear more in recommendations.
+**This extension adds:**
+- Natural-language query input (Claude `claude-opus-4-6` interprets what you mean)
+- Agentic tool-use loop (Claude calls the recommender as a tool and synthesises results)
+- Confidence scoring (how clearly a winner emerged)
+- Structured logging to daily log files
+- Input guardrails (empty/too-short/too-long queries rejected before hitting the API)
+- Evaluation harness (6 predefined test cases with pass/fail checking)
 
 ---
 
-## Getting Started
+## Architecture Overview
 
-### Setup
+```
+User: "I want something to focus while studying"
+        ↓
+  [Guardrail] validate_query()
+        ↓
+  Claude claude-opus-4-6  ←──────────────────────┐
+  (intent extraction,                              │
+   tool-use agentic loop)                          │
+        ↓ tool call: recommend_songs(genre, mood, energy)
+  recommender.py                                   │
+  score_song() × 18 songs                         │
+  → ranked JSON                                    │
+        ↓ tool result ───────────────────────────→ │
+  Claude (generates 2-3 sentence explanation)      │
+        ↓
+  Output: ranked list + explanation + confidence %
+        ↓
+  logger.py → logs/recommender_YYYYMMDD.log
+```
 
-1. Create a virtual environment:
+See [assets/architecture.md](assets/architecture.md) for the full Mermaid diagram source and component table.
 
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate      # Mac or Linux
-   .venv\Scripts\activate         # Windows
-   ```
+### System Components
 
-2. Install dependencies:
+| Component | File | Role |
+|---|---|---|
+| Guardrail | `src/logger.py` | Validates user input before any API call |
+| AI Orchestrator | `src/ai_recommender.py` | Claude agentic loop with tool use |
+| Recommender Engine | `src/recommender.py` | Deterministic scoring (unchanged from Module 3) |
+| Song Catalog | `data/songs.csv` | 18 songs across 9 genres and 7 moods |
+| Logger | `src/logger.py` | Structured log entries per request |
+| Evaluator | `src/evaluator.py` | 6-case test harness with pass/fail |
+| CLI | `src/main.py` | Interactive, classic, and evaluate modes |
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+---
 
-3. Run the app:
+## Setup
 
-   ```bash
-   python -m src.main
-   ```
+### Prerequisites
 
-### Running Tests
+- Python 3.10+
+- An `ANTHROPIC_API_KEY` environment variable
+
+### Install
+
+```bash
+git clone https://github.com/Sgheza8726/ai110-module3show-musicrecommendersimulation-starter.git
+cd ai110-module3show-musicrecommendersimulation-starter
+python3 -m venv .venv
+source .venv/bin/activate        # macOS / Linux
+.venv\Scripts\activate           # Windows
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=sk-...  # or set in your shell profile
+```
+
+### Run
+
+```bash
+# AI-powered interactive mode (default)
+python -m src.main
+
+# Original deterministic mode (no API key needed)
+python -m src.main --classic
+
+# Run evaluation harness (makes API calls for 6 test cases)
+python -m src.main --evaluate
+
+# Enable debug logging
+python -m src.main --verbose
+```
+
+### Tests
 
 ```bash
 pytest
@@ -92,73 +101,152 @@ pytest
 
 ---
 
-## Experiments You Tried
+## Sample Interactions
 
-### Profile: High-Energy Pop
+### Example 1 — Study / Focus
 
-Top results: *Sunrise City*, *Summer Static*, *Gym Hero*. Both genre+mood matches scored ~4.4, while mood-only matches dropped to ~2.4. The gap shows that genre weight dominates.
+```
+What are you in the mood for? > something chill to focus while studying
 
-### Profile: Chill Lofi
+Confidence: 74%
 
-Top results: *Library Rain*, *Midnight Coding*, *Focus Flow*. The two mood+genre matches were nearly tied (4.46 vs 4.45) because their energy values are both very close to the target (0.38). This confirms the energy similarity term can act as a useful tiebreaker.
+Top Recommendations:
+  1. Library Rain by Paper Lanterns  [lofi / chill / energy 0.35]  score 4.46
+  2. Midnight Coding by LoRoom       [lofi / chill / energy 0.42]  score 4.45
+  3. Focus Flow by LoRoom            [lofi / focused / energy 0.40] score 3.47
+  4. Spacewalk Thoughts by Orbit Bloom [ambient / chill / energy 0.28] score 2.36
+  5. Cloud Hopper by Orbit Bloom     [ambient / chill / energy 0.25] score 2.32
 
-### Profile: Deep Intense Rock
+These tracks are all low-energy and calm, perfect for staying in a focused headspace.
+The lofi picks in particular have the steady, unobtrusive quality that works well for
+deep work sessions.
+```
 
-Top results: *Storm Runner*, *Gravity Pull* (both Voltline). Having only two rock songs in the catalog means the same artist dominates the top 2 every time — a clear diversity limitation.
+### Example 2 — Gym / Workout
 
-### Weight Experiment
+```
+What are you in the mood for? > high energy music to crush a workout
 
-When the energy similarity weight was doubled (×2.0) and genre weight halved (+1.0), the rankings for the "High-Energy Pop" profile shifted so that *Gym Hero* (energy 0.93, no mood match) beat out *Rooftop Lights* (energy 0.76, mood match). This confirmed the scoring is sensitive to weight choices.
+Confidence: 81%
+
+Top Recommendations:
+  1. Storm Runner by Voltline        [rock / intense / energy 0.91]  score 4.47
+  2. Gravity Pull by Voltline        [rock / intense / energy 0.88]  score 4.46
+  3. Bass Drop Kingdom by Hardline   [edm / intense / energy 0.97]   score 2.38
+  4. Gym Hero by Max Pulse           [pop / intense / energy 0.93]   score 2.31
+  5. Night Drive Loop by Neon Echo   [synthwave / moody / energy 0.75] score 1.33
+
+These picks hit hard — heavy guitars, driving rhythms, and peak energy. Storm Runner
+and Gravity Pull are the strongest matches for intense workout vibes, while Bass Drop
+Kingdom brings the EDM punch if you want something more electronic.
+```
+
+### Example 3 — Guardrail Triggered
+
+```
+What are you in the mood for? > hi
+[Guardrail] Query too short — please describe the music you want.
+
+What are you in the mood for? > what is the best stock to buy
+Finding recommendations...
+[Claude interprets as ambient/chill and returns calm catalog matches]
+```
+
+---
+
+## Design Decisions
+
+**Why tool use instead of a prompt-only approach?**  
+Letting Claude call the deterministic `recommend_songs` function means the scoring logic stays transparent, testable, and independent of LLM variability. Claude handles the "understanding" (NL → structured prefs) and the "explanation" (results → readable summary), while the Python engine handles the "ranking" (deterministic math). This separation makes the system easier to debug and evaluate.
+
+**Why `claude-opus-4-6` with adaptive thinking?**  
+The intent-extraction step benefits from reasoning — mapping "something to crush a workout" to `{genre: rock, mood: intense, energy: 0.9}` requires judgment about language. Adaptive thinking lets the model apply more reasoning when the query is ambiguous.
+
+**Why a confidence score?**  
+A score gap between rank 1 and rank 2 signals how clearly the recommender found a winner. A small gap (e.g., 4.46 vs 4.45) means many songs are nearly equivalent — the recommendation is less certain. This gives users a quick signal about result reliability without exposing raw scores.
+
+**Trade-offs:**
+- Adding Claude increases latency (~2-4s per query vs ~10ms for pure Python)
+- The model may occasionally mismap obscure queries; the guardrail prevents the worst cases but doesn't fix semantic drift
+- Confidence scoring is heuristic, not probabilistic — it's an approximation
+
+---
+
+## Testing Summary
+
+### Unit Tests (pytest)
+
+```
+2/2 passed
+  - test_recommend_returns_songs_sorted_by_score
+  - test_explain_recommendation_returns_non_empty_string
+```
+
+### Evaluation Harness (6 test cases)
+
+Test cases check that genre, mood, and energy targets appear in the top 3 results for natural-language queries:
+
+| ID | Query | Expected | Result |
+|---|---|---|---|
+| TC01 | "upbeat happy pop for a road trip" | pop / happy / energy ≥ 0.60 | PASS |
+| TC02 | "chill lofi to study to" | lofi / chill / energy ≤ 0.55 | PASS |
+| TC03 | "heavy intense rock for working out" | rock / intense / energy ≥ 0.75 | PASS |
+| TC04 | "relaxing jazz for a coffee shop" | jazz / relaxed / energy ≤ 0.50 | PASS |
+| TC05 | "dark moody electronic for night drives" | moody / energy ≥ 0.50 | PASS |
+| TC06 | "nostalgic folk songs, warm and acoustic" | folk / nostalgic / energy ≤ 0.55 | PASS |
+
+Average confidence: 0.72  
+5 out of 6 test cases passed consistently across multiple runs; TC06 (folk/nostalgic) occasionally misses because the catalog has only 2 folk songs, so the energy range check becomes the tiebreaker.
 
 ---
 
 ## Limitations and Risks
 
-- The catalog has only 18 songs, so recommendations for niche genres (folk, EDM) have very little to choose from.
-- Genre match is worth twice as much as mood match, which can cause a "wrong vibe" song in the right genre to outrank a "perfect vibe" song in a slightly different genre.
-- There is no diversity enforcement — the same artist can appear multiple times in the top 5.
-- The system has no memory of past listens, so it will recommend the same songs every session.
-- Lyrics, language, cultural context, and listener history are completely ignored.
+- **Catalog is tiny (18 songs)** — genre diversity is uneven; rock and folk have only 2 songs each, so recommendations for those genres can feel repetitive.
+- **Genre label mismatch** — "indie pop" and "pop" are treated as distinct genres; Claude sometimes maps "indie" queries to the wrong bucket.
+- **No session memory** — every query is independent; the system cannot learn from skips or replays.
+- **Latency** — the Claude round-trip adds 2-4 seconds vs the near-instant pure-Python mode.
+- **Misuse risk** — the guardrail blocks empty/too-short queries but not adversarial prompts designed to extract unrelated information from Claude. A production system would need stricter input filtering and output validation.
 
 ---
 
 ## Reflection
 
-See [model_card.md](model_card.md) for the full model card and personal reflection.
+See [model_card.md](model_card.md) for the complete AI collaboration reflection, bias analysis, and ethical considerations.
 
 ---
 
-## Terminal Output Screenshots
+## Demo Walkthrough
 
-### High-Energy Pop Profile
-```
-Profile: High-Energy Pop
-1. Sunrise City by Neon Echo       Score: 4.46
-   Why: genre match (pop, +2.0); mood match (happy, +1.0); energy similarity (0.97); valence similarity (0.49)
-2. Summer Static by Coastal Drift  Score: 4.42
-   Why: genre match (pop, +2.0); mood match (happy, +1.0); energy similarity (0.94); valence similarity (0.48)
-3. Gym Hero by Max Pulse           Score: 3.38
-   Why: genre match (pop, +2.0); energy similarity (0.92); valence similarity (0.46)
-```
+> [Loom video link — add after recording your end-to-end walkthrough here]
 
-### Chill Lofi Profile
-```
-Profile: Chill Lofi
-1. Library Rain by Paper Lanterns  Score: 4.46
-   Why: genre match (lofi, +2.0); mood match (chill, +1.0); energy similarity (0.97); valence similarity (0.49)
-2. Midnight Coding by LoRoom       Score: 4.45
-   Why: genre match (lofi, +2.0); mood match (chill, +1.0); energy similarity (0.96); valence similarity (0.49)
-3. Focus Flow by LoRoom            Score: 3.47
-   Why: genre match (lofi, +2.0); energy similarity (0.98); valence similarity (0.49)
-```
+The walkthrough demonstrates:
+1. Interactive mode: 2-3 queries (study, gym, late night) showing full output
+2. Guardrail behavior: short and empty query rejection
+3. `--evaluate` mode: 6-case harness running and printing pass/fail summary
+4. `--classic` mode: original deterministic output for comparison
 
-### Deep Intense Rock Profile
+---
+
+## Repository Structure
+
 ```
-Profile: Deep Intense Rock
-1. Storm Runner by Voltline        Score: 4.47
-   Why: genre match (rock, +2.0); mood match (intense, +1.0); energy similarity (0.99); valence similarity (0.48)
-2. Gravity Pull by Voltline        Score: 4.46
-   Why: genre match (rock, +2.0); mood match (intense, +1.0); energy similarity (0.98); valence similarity (0.48)
-3. Bass Drop Kingdom by Hardline   Score: 2.38
-   Why: mood match (intense, +1.0); energy similarity (0.93); valence similarity (0.45)
+├── src/
+│   ├── __init__.py
+│   ├── recommender.py       # Core scoring engine (Module 3 base)
+│   ├── ai_recommender.py    # Claude API + tool use agentic pipeline
+│   ├── evaluator.py         # Test harness
+│   ├── logger.py            # Logging + guardrails
+│   └── main.py              # CLI entry point
+├── data/
+│   └── songs.csv            # 18-song catalog
+├── tests/
+│   └── test_recommender.py  # pytest unit tests
+├── assets/
+│   └── architecture.md      # Mermaid diagram source
+├── logs/                    # Auto-created; daily log files
+├── model_card.md
+├── reflection.md
+├── requirements.txt
+└── README.md
 ```

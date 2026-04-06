@@ -1,94 +1,107 @@
-# 🎧 Model Card: Music Recommender Simulation
+# 🎧 Model Card — AI Music Recommender
 
 ## 1. Model Name
 
-**VibeFinder 1.0**
+**VibeFinder 2.0** (extended from VibeFinder 1.0, Module 3)
 
 ---
 
 ## 2. Intended Use
 
-VibeFinder is designed to suggest 3–5 songs from a small catalog based on a user's preferred genre, mood, energy level, and valence. It is built for classroom exploration and demonstration purposes — not for production use with real listeners. The system assumes the user knows their own preferences and can express them as a simple dictionary of values.
+VibeFinder 2.0 suggests 3–5 songs from a small catalog based on a user's natural-language description of what they want to hear. It is designed for classroom demonstration of how LLMs can be integrated into existing algorithmic systems — not for deployment to real streaming users.
 
-**Non-intended use:** This model should not be deployed to real users on a streaming platform. It lacks listening history, skip data, collaborative signals, and any content understanding beyond basic numerical attributes.
+**Intended:**
+- Classroom exploration of AI-integrated recommendation pipelines
+- Demonstrating agentic tool use and NL-to-structured-data extraction
+
+**Not intended:**
+- Production music streaming (catalog too small, no personalization history)
+- Medical, legal, or safety-critical applications
+- Replacing human music curation
 
 ---
 
 ## 3. How the Model Works
 
-The recommender reads a list of songs from a spreadsheet. Each song has attributes like genre (pop, rock, lofi), mood (happy, chill, intense), and a set of numbers describing how energetic, danceable, positive, and acoustic it sounds.
+VibeFinder 2.0 has two layers working together:
 
-When a user tells the system their preferences, the system goes through every song in the catalog and gives it a point score:
+**Layer 1 — AI Understanding (Claude):** When a user types something like "I want something intense for the gym," Claude reads that sentence and translates it into a set of numbers and labels: a genre (rock), a mood (intense), and an energy level (0.9). This is the same kind of thing a human music librarian would do — they hear what you want and mentally filter the collection.
 
-- **+2.0 points** if the song's genre matches the user's preferred genre — the biggest reward, because genre is the clearest signal of musical taste.
-- **+1.0 point** if the song's mood matches the user's preferred mood.
-- **Up to 1.0 points** based on how close the song's energy level is to the user's target — a song with energy 0.80 scores almost perfectly for a user who wants 0.82.
-- **Up to 0.5 points** based on how close the song's valence (musical positivity) is to the user's target.
+**Layer 2 — Algorithmic Scoring (Python):** The scoring engine goes through every song in the catalog and gives it a point score: +2 for matching genre, +1 for matching mood, and fractional points based on how close the song's energy is to your target. Songs are then sorted and the top results are returned.
 
-After every song is scored, the system sorts the list from highest to lowest and returns the top results along with a plain-language explanation of which attributes contributed points.
+Claude then reads those results and writes a 2-3 sentence explanation in plain language.
 
 ---
 
 ## 4. Data
 
-- **Catalog size:** 18 songs
+- **Catalog:** 18 songs across 9 genres (pop, rock, lofi, jazz, ambient, edm, folk, synthwave, indie pop) and 7 moods
 - **Features per song:** genre, mood, energy (0–1), tempo\_bpm, valence (0–1), danceability (0–1), acousticness (0–1)
-- **Genres represented:** pop, lofi, rock, ambient, jazz, synthwave, indie pop, folk, edm
-- **Moods represented:** happy, chill, intense, relaxed, moody, focused, nostalgic
-- **Data source:** Hand-crafted starter set (10 songs) expanded with 8 additional songs generated for genre/mood diversity
-- **Missing from data:** lyrics, language, cultural origin, listener demographics, play counts, release year context
-
-The dataset reflects a Western, English-language taste bias — genres like K-pop, Afrobeats, or classical are entirely absent.
+- **Data source:** Hand-crafted, no real song metadata or audio features
+- **Representation gaps:** No classical, hip-hop, R&B, K-pop, Afrobeats, or non-English genres; no release year or cultural context
+- **Whose taste?** The catalog reflects Western popular music categories with a bias toward genres common in lo-fi study playlists and gym playlists
 
 ---
 
 ## 5. Strengths
 
-- **Transparent:** Every recommendation includes an exact breakdown of which rules fired and how many points each contributed. A user can always see *why* a song was suggested.
-- **Deterministic:** Given the same user profile and catalog, the system always returns the same results — no randomness or black-box behavior.
-- **Works well for clear, narrow preferences:** A user who strongly prefers pop+happy gets coherent, intuitive results at the top of the list.
-- **Energy as a tiebreaker:** When two songs match genre and mood, the energy similarity score acts as a meaningful differentiator.
+- **Transparent:** Every recommendation includes an exact breakdown of which scoring rules fired and how many points each contributed — there is no black box.
+- **Separation of concerns:** Claude handles ambiguous language; the Python engine handles deterministic math. If Claude extracts the wrong genre, the scoring result is still predictable and auditable.
+- **Confidence signal:** The confidence score gives users a quick indicator of how clear the result was — a 90% confidence means one song clearly dominated; 60% means several songs were close.
+- **Robust to phrasing variations:** Claude can map "something to crush a workout" and "high energy gym music" to the same structured preferences, where a keyword-matching system would fail.
 
 ---
 
 ## 6. Limitations and Bias
 
-- **Genre dominance creates a filter bubble.** Because a genre match is worth +2.0 — twice the weight of a mood match — the system will almost always surface genre-matching songs first, even if their mood, energy, and valence are far from ideal. A "relaxed pop" song will beat a "happy jazz" song for a happy-pop user, even if the jazz track feels more right.
-- **Catalog imbalance amplifies the bubble.** Pop and lofi each have 3+ songs; folk, EDM, and synthwave have only 1–2. Users whose taste sits in underrepresented genres get fewer meaningful choices.
-- **No artist diversity enforcement.** The same artist (e.g., Voltline) can occupy the top 2 slots if their songs best match the profile. Real systems add diversity constraints to avoid this.
-- **Binary genre matching.** "Indie pop" and "pop" are treated as entirely different genres even though they share characteristics. A more nuanced system would use genre similarity scores.
-- **No temporal awareness.** The system recommends the same songs in every session regardless of how recently they were played.
+- **Genre dominance creates filter bubbles.** Genre matching is worth +2.0 — twice the mood weight. If Claude maps a query to the wrong genre, the top results will feel completely wrong even if mood and energy are right. The user has no way to correct this in the current interface.
+- **Catalog imbalance.** Pop and lofi each have 3+ songs; folk, EDM, and synthwave have 1–2 each. Users with niche tastes get fewer meaningful choices not because the algorithm fails, but because the data is thin.
+- **Binary genre labels.** "Indie pop" and "pop" are separate strings. A query for "indie" might match one and not the other, even though they share sonic characteristics.
+- **Claude can hallucinate preferences.** For very ambiguous queries (e.g., "something nostalgic"), Claude may confidently pick a genre that doesn't match what the user had in mind. There is no feedback loop to correct this.
+- **No diversity enforcement.** The same artist (e.g., Voltline) can appear twice in the top 5. Real systems add diversity constraints.
 
 ---
 
 ## 7. Evaluation
 
-Three distinct user profiles were tested:
+Six test cases were run with the evaluation harness (`python -m src.main --evaluate`):
 
-| Profile | Target | Top Result | Surprise? |
+| ID | Query | Expected | Status |
 |---|---|---|---|
-| High-Energy Pop | genre=pop, mood=happy, energy=0.85 | Sunrise City (4.46) | No — intuitive match |
-| Chill Lofi | genre=lofi, mood=chill, energy=0.38 | Library Rain (4.46) | No — clear winner |
-| Deep Intense Rock | genre=rock, mood=intense, energy=0.90 | Storm Runner (4.47) | Mild — same artist in top 2 |
+| TC01 | "upbeat happy pop for a road trip" | pop/happy/energy≥0.6 | PASS |
+| TC02 | "chill lofi to study to" | lofi/chill/energy≤0.55 | PASS |
+| TC03 | "heavy intense rock for working out" | rock/intense/energy≥0.75 | PASS |
+| TC04 | "relaxing jazz for a coffee shop" | jazz/relaxed/energy≤0.50 | PASS |
+| TC05 | "dark moody electronic for night drives" | moody/energy≥0.50 | PASS |
+| TC06 | "nostalgic folk songs, warm and acoustic" | folk/nostalgic/energy≤0.55 | PASS |
 
-**What surprised me:** The Chill Lofi profile produced two songs with nearly identical scores (4.46 vs 4.45). This shows that with a small catalog, tiny differences in energy distance can be the only differentiator. If the catalog were larger, this sensitivity would matter more.
+**What surprised me:** TC05 (dark moody electronic) passed even though neither "ambient" nor "synthwave" was explicitly expected — Claude correctly mapped "electronic" to "synthwave" or "ambient" without being told those were options. The model's world knowledge about genre labels helped where a keyword system would have failed.
 
-**Logic experiment:** Doubling the energy weight and halving the genre weight changed whether a mood-only match or an energy-close genre match won. This confirmed the system is sensitive to weight choices and that no single weighting is universally "correct."
+**What struggled:** TC06 sometimes produces borderline confidence because only 2 folk songs exist. When the genre matches but energy expectations are tight, the result is technically correct but feels thin.
 
 ---
 
 ## 8. Future Work
 
-1. **Add a diversity penalty** — if an artist already appears in the top results, reduce the score of their other songs so a wider range of artists surfaces.
-2. **Genre similarity scoring** — instead of a binary genre match, use a similarity table (e.g., "indie pop" is 70% similar to "pop") to reduce harsh mismatches.
-3. **Collaborative filtering layer** — collect implicit signals (play count, skips, repeat listens) and blend them with content scores so the system learns from behavior over time.
+1. **Expand and diversify the catalog** — At minimum 5 songs per genre to give the scoring engine meaningful variety. Ideally integrate with a real music API (Spotify, MusicBrainz) for real audio features.
+2. **Add a diversity penalty** — Prevent the same artist from appearing more than once in the top 5 results.
+3. **Session memory** — Track which songs were played or skipped and adjust future recommendations (collaborative signal).
+4. **Feedback loop** — After recommendations, ask "Did this feel right?" and use the answer to weight Claude's genre/mood mappings in future sessions.
 
 ---
 
 ## 9. Personal Reflection
 
-Building VibeFinder made the inner workings of recommendation systems feel much less mysterious. What looks like "magic" on Spotify is, at its core, a loop that scores every candidate against a set of rules and picks the winners — the same loop I wrote in `score_song`. The biggest surprise was how much the **weight choices** matter: doubling the energy weight changed which songs appeared, even though no preferences changed. This made me realize that every weighting decision is a design choice that reflects the developer's assumptions about what users care about — and those assumptions can easily be wrong.
+### AI Collaboration
 
-Using AI tools helped me draft the initial structure quickly, but I had to verify every piece of logic myself. The AI suggested reasonable starting weights, but testing with real profiles was the only way to see whether the results actually "felt right." Human judgment — asking "does this recommendation make sense to a person?" — was essential at every evaluation step and can't be replaced by the algorithm itself.
+**Helpful instance:** When designing the tool use architecture, Claude suggested separating the intent-extraction step (NL → structured preferences) from the scoring step (preferences → ranked songs) rather than having Claude score songs directly in prose. This was the right call — it keeps the scoring auditable and the AI layer replaceable. I kept that design.
 
-If I extended this project, I would add a diversity constraint and experiment with blending content scores with simple popularity data to see whether real-world appeal improves the recommendations beyond pure attribute matching.
+**Flawed instance:** When I asked Claude to suggest confidence scoring logic, it proposed using the LLM's own token-probability outputs as a confidence signal. This sounded plausible but was wrong for this use case — token probabilities reflect Claude's uncertainty about language, not about whether the *recommender algorithm* found a good match. I replaced it with a score-gap heuristic based on the recommender's own output.
+
+### What I Learned
+
+Building this system clarified something I found confusing before: the difference between *what an LLM does well* and *what deterministic code does well*. Claude is good at understanding what "a road trip vibe" means and translating it into structured data. Python is good at applying consistent math to 18 songs and returning the same answer every time. The power came from connecting the two — not from replacing one with the other.
+
+The hardest part was the confidence scoring. A confidence score implies the system knows how certain it is, but the system is actually two separate components with different failure modes. Claude might be very confident about genre but completely wrong, and the Python engine might return a low-confidence spread because the catalog is sparse, not because the genre was wrong. I settled for a heuristic that measures the *ranking spread*, which at least captures whether the recommendation was unambiguous — even if it can't diagnose *why*.
+
+Real music recommenders on Spotify or YouTube combine hundreds of signals — collaborative filtering, audio fingerprinting, recency, social graph — in ways that make even their creators uncertain about why specific songs surface. Building this simple version made me more skeptical of any recommendation system that claims to "understand" what you want. The system doesn't understand anything; it matches patterns in the way it was told to match them.
