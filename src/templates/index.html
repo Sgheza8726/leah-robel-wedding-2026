@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ site.couple }} | {{ page.title }}</title>
+  <meta name="description" content="Welcome to the website for {{ site.couple }}. Explore photos, accommodations, and more." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='wedding.css') }}" />
+</head>
+<body>
+  <main class="shell">
+    <header class="nav-wrap">
+      <h1 class="site-title">{{ site.couple }}</h1>
+      <nav aria-label="Wedding pages">
+        <ul>
+          {% for item in site.nav %}
+            <li><a href="{{ item.href }}" class="{% if item.slug == page_slug %}active{% endif %}">{{ item.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </header>
+
+    {% if page.slug == "welcome" %}
+      <section class="hero-trio" aria-label="Photo gallery">
+        {% for image in site.photos.trio %}
+          <div class="hero-card"><img src="{{ image }}" alt="{{ site.couple }} wedding photo {{ loop.index }}" /></div>
+        {% endfor %}
+      </section>
+    {% else %}
+      <section class="cover-wrap" aria-label="{{ page.title }} cover image">
+        <div class="cover">
+          <img src="{{ site.photos|attr(page.cover) }}" alt="{{ page.title }} cover photo" />
+        </div>
+      </section>
+    {% endif %}
+
+    <div class="accent">
+      <img src="{{ site.accent_image }}" alt="" />
+    </div>
+
+    <section class="content">
+      {% if page.eyebrow %}
+        <p class="eyebrow">{{ page.eyebrow }}</p>
+      {% endif %}
+      <h2 class="page-title">{{ page.heading }}</h2>
+      <p class="intro">{{ page.intro }}</p>
+
+      {% for section in page.sections %}
+        {% if section.type == "callout" %}
+          <article class="callout">
+            <h3>{{ section.title }}</h3>
+            <p>{{ section.body }}</p>
+          </article>
+        {% elif section.type == "grid" %}
+          <div class="grid">
+            {% for item in section.entries %}
+              <article class="grid-item">
+                <strong>{{ item.label }}</strong>
+                <p>{{ item.value }}</p>
+              </article>
+            {% endfor %}
+          </div>
+        {% elif section.type == "timeline" %}
+          <div class="timeline">
+            {% for item in section.entries %}
+              <article class="timeline-item">
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.body }}</p>
+              </article>
+            {% endfor %}
+          </div>
+        {% elif section.type == "faq" %}
+          <div class="faq">
+            {% for item in section.entries %}
+              <article class="faq-item">
+                <h3>{{ item.q }}</h3>
+                <p>{{ item.a }}</p>
+              </article>
+            {% endfor %}
+          </div>
+        {% elif section.type == "gallery" %}
+          <div class="gallery">
+            {% for image in section.entries %}
+              <figure>
+                <img src="{{ image }}" alt="{{ site.couple }} moment {{ loop.index }}" />
+              </figure>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <p class="footer-note">{{ site.couple }}</p>
+    </section>
+  </main>
+</body>
+</html>
