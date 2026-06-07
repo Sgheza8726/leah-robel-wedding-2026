@@ -7,42 +7,84 @@
   <meta name="description" content="Welcome to the website for {{ site.couple }}. Explore photos, accommodations, and more." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Cinzel:wght@400;700&family=Inter:wght@400;500;600&family=Parisienne&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='wedding.css') }}" />
 </head>
-<body>
+<body class="page-{{ page.slug }}">
+  <div class="meskel meskel-left" aria-hidden="true"></div>
+  <div class="meskel meskel-right" aria-hidden="true"></div>
   <main class="shell">
     <header class="nav-wrap">
-      <h1 class="site-title">{{ site.couple }}</h1>
-      <nav aria-label="Wedding pages">
-        <ul>
-          {% for item in site.nav %}
-            <li><a href="{{ item.href }}" class="{% if item.slug == page_slug %}active{% endif %}">{{ item.label }}</a></li>
-          {% endfor %}
-        </ul>
-      </nav>
+      {% if page.slug == "welcome" %}
+      {% else %}
+        <a class="site-title site-title-link" href="/" aria-label="Return to welcome page">{{ site.monogram }}</a>
+        <nav aria-label="Wedding pages">
+          <ul>
+            {% for item in site.nav %}
+              <li><a href="{{ item.href }}" class="{% if item.slug == page_slug %}active{% endif %}">{{ item.label }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
+      {% endif %}
     </header>
 
     {% if page.slug == "welcome" %}
-      <section class="hero-trio" aria-label="Photo gallery">
-        {% for image in site.photos.trio %}
-          <div class="hero-card"><img src="{{ image }}" alt="{{ site.couple }} wedding photo {{ loop.index }}" /></div>
+      <section class="hero-slideshow" aria-label="Photo slideshow">
+        {% for image in site.photos.slideshow %}
+          <div class="slide slide-{{ loop.index }} {% if loop.first %}active{% endif %}">
+            <img src="{{ image }}" alt="{{ site.couple }} wedding photo {{ loop.index }}" />
+          </div>
         {% endfor %}
-      </section>
-    {% else %}
-      <section class="cover-wrap" aria-label="{{ page.title }} cover image">
-        <div class="cover">
-          <img src="{{ site.photos|attr(page.cover) }}" alt="{{ page.title }} cover photo" />
+        <div class="hero-overlay">
+          <h2 class="hero-title">{{ site.couple }}</h2>
+          <p class="hero-kicker">{{ site.greeting_tigrinya }}</p>
+          <p class="hero-date">{{ site.event_date_label }}</p>
+          <p class="countdown" id="countdown" data-target="{{ site.countdown_target_iso }}">Loading countdown...</p>
         </div>
+      </section>
+      <section class="home-nav-band" aria-label="Wedding pages">
+        <nav>
+          <ul>
+            {% for item in site.nav %}
+              <li><a href="{{ item.href }}">{{ item.label }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
       </section>
     {% endif %}
 
-    <div class="accent">
-      <img src="{{ site.accent_image }}" alt="" />
-    </div>
+    {% if page.slug == "welcome" %}
+      <div class="accent">
+        <img src="{{ site.accent_image }}" alt="" />
+      </div>
+    {% endif %}
 
-    <section class="content">
+    {% if page.slug == "welcome" %}
+    <section class="content content-home">
+    {% else %}
+    <section class="content content-inner">
+      <aside class="side-photo side-photo-left" aria-hidden="true">
+        <img src="{{ site.photos.story_cover }}" alt="" />
+      </aside>
+      <div class="content-center">
+    {% endif %}
+      {% if page.slug == "welcome" %}
+        <div class="ornament" aria-hidden="true">
+          <span></span>
+          <i></i>
+          <span></span>
+        </div>
+      {% endif %}
+
+      {% if page.slug == "welcome" %}
+        <section class="welcome-event">
+          <h2 class="welcome-couple">{{ site.couple }}</h2>
+          <p class="welcome-meta">{{ site.event_location }}</p>
+          <a class="rsvp-button" href="/rsvp">RSVP</a>
+          <p class="welcome-message">{{ site.welcome_message }}</p>
+        </section>
+      {% endif %}
+
       {% if page.eyebrow %}
         <p class="eyebrow">{{ page.eyebrow }}</p>
       {% endif %}
@@ -54,7 +96,62 @@
           <article class="callout">
             <h3>{{ section.title }}</h3>
             <p>{{ section.body }}</p>
+            {% if page.slug == "rsvp" %}
+              <span class="inline-link">{{ site.rsvp_label }}</span>
+            {% endif %}
           </article>
+          {% if page.slug == "rsvp" %}
+            <form class="rsvp-form" method="post" action="/rsvp">
+              {% if rsvp.success %}
+                <p class="form-status form-status-success">Thank you. Your RSVP has been submitted.</p>
+              {% endif %}
+              {% if rsvp.error %}
+                <p class="form-status form-status-error">{{ rsvp.error }}</p>
+              {% endif %}
+
+              <label>
+                <span>Full Name</span>
+                <input type="text" name="guest_name" value="{{ rsvp.form_data.guest_name }}" required />
+              </label>
+
+              <div class="form-split">
+                <label>
+                  <span>Email</span>
+                  <input type="email" name="email" value="{{ rsvp.form_data.email }}" required />
+                </label>
+                <label>
+                  <span>Phone</span>
+                  <input type="tel" name="phone" value="{{ rsvp.form_data.phone }}" />
+                </label>
+              </div>
+
+              <div class="form-split">
+                <label>
+                  <span>Will You Attend?</span>
+                  <select name="attending">
+                    <option value="yes" {% if rsvp.form_data.attending == "yes" %}selected{% endif %}>Joyfully attending</option>
+                    <option value="no" {% if rsvp.form_data.attending == "no" %}selected{% endif %}>Unable to attend</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Total Number in Your Party</span>
+                  <input type="number" name="guest_count" min="1" max="8" value="{{ rsvp.form_data.guest_count }}" />
+                </label>
+              </div>
+
+              <label>
+                <span>Names of Additional Guests</span>
+                <textarea name="guest_names" rows="3" placeholder="List any additional guests included on your invitation.">{{ rsvp.form_data.guest_names }}</textarea>
+              </label>
+
+              <label>
+                <span>Dietary Notes or Message</span>
+                <textarea name="dietary_notes" rows="4" placeholder="Share any food restrictions or a note for the couple.">{{ rsvp.form_data.dietary_notes }}</textarea>
+              </label>
+
+              <button class="rsvp-button" type="submit">{{ site.rsvp_label }}</button>
+            </form>
+          {% endif %}
         {% elif section.type == "grid" %}
           <div class="grid">
             {% for item in section.entries %}
@@ -64,6 +161,69 @@
               </article>
             {% endfor %}
           </div>
+        {% elif section.type == "events" %}
+          <section class="events">
+            <div class="section-heading">
+              <p class="section-kicker">Wedding Day</p>
+              <h3>{{ section.title }}</h3>
+            </div>
+            <div class="event-list">
+              {% for item in section.entries %}
+                <article class="event-card {% if page.slug == "itinerary" and loop.first %}event-card-hero{% endif %}">
+                  {% if page.slug == "itinerary" and loop.first %}
+                    <div class="event-photo-card" aria-hidden="true"></div>
+                  {% endif %}
+                  <p class="event-time">{{ item.time }}</p>
+                  <div class="event-copy">
+                    <h4>{{ item.title }}</h4>
+                    {% if "Church" in item.location or "Event Center" in item.location %}
+                      <p class="event-location {% if page.slug == "itinerary" and loop.first %}event-location-overlay{% endif %}"><a class="inline-link" href="https://maps.google.com/?q={{ item.location|urlencode }}" target="_blank" rel="noreferrer">{{ item.location }}</a></p>
+                    {% else %}
+                      <p class="event-location">{{ item.location }}</p>
+                    {% endif %}
+                    <p>{{ item.body }}</p>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        {% elif section.type == "links" %}
+          <div class="link-strip">
+            {% for item in section.entries %}
+              <a class="link-pill" href="{{ item.href }}" {% if item.external %}target="_blank" rel="noreferrer"{% endif %}>{{ item.label }} <span aria-hidden="true">→</span></a>
+            {% endfor %}
+          </div>
+        {% elif section.type == "lodging" %}
+          <section class="lodging">
+            <div class="section-heading">
+              <p class="section-kicker">Guest Stay</p>
+              <h3>{{ section.title }}</h3>
+              <p class="lodging-map-note">{{ section.map_note }}</p>
+            </div>
+            <div class="lodging-list">
+              {% for item in section.entries %}
+                <article class="lodging-card">
+                  <div class="lodging-card-top">
+                    <div>
+                      <h4>{{ item.name }}</h4>
+                      <p class="lodging-distance">{{ item.distance }}</p>
+                    </div>
+                    <div class="lodging-price">
+                      {% if item.savings %}
+                        <p class="lodging-savings">{{ item.savings }}</p>
+                      {% endif %}
+                      <p class="lodging-rate">Nightly {{ item.rate }}</p>
+                      {% if item.special_rate %}
+                        <p class="lodging-special">Special Event Rate {{ item.special_rate }}</p>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <p class="lodging-body">{{ item.body }}</p>
+                  <a class="inline-link" href="{{ item.href }}">Book Now</a>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
         {% elif section.type == "timeline" %}
           <div class="timeline">
             {% for item in section.entries %}
@@ -90,11 +250,64 @@
               </figure>
             {% endfor %}
           </div>
+        {% elif section.type == "lyrics" %}
+          <section class="lyrics">
+            <h3>{{ section.title }}</h3>
+            {% for line in section.lines %}
+              <p>{{ line }}</p>
+            {% endfor %}
+          </section>
         {% endif %}
       {% endfor %}
 
       <p class="footer-note">{{ site.couple }}</p>
+    {% if page.slug != "welcome" %}
+      </div>
+      <aside class="side-photo side-photo-right" aria-hidden="true">
+        <img src="{{ site.photos.alt_cover }}" alt="" />
+      </aside>
+    {% endif %}
     </section>
   </main>
+  <script>
+    const countdownElement = document.getElementById("countdown");
+    const slides = Array.from(document.querySelectorAll(".slide"));
+
+    if (countdownElement) {
+      const target = new Date(countdownElement.dataset.target);
+
+      const renderCountdown = () => {
+        const now = new Date();
+        const diff = target - now;
+
+        if (diff <= 0) {
+          countdownElement.textContent = "0 days 0 hrs 0 mins 0 secs";
+          return;
+        }
+
+        const totalSeconds = Math.floor(diff / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        countdownElement.textContent =
+          `${days} days ${hours} hrs ${minutes} mins ${seconds} secs`;
+      };
+
+      renderCountdown();
+      window.setInterval(renderCountdown, 1000);
+    }
+
+    if (slides.length > 1) {
+      let activeIndex = 0;
+
+      window.setInterval(() => {
+        slides[activeIndex].classList.remove("active");
+        activeIndex = (activeIndex + 1) % slides.length;
+        slides[activeIndex].classList.add("active");
+      }, 4500);
+    }
+  </script>
 </body>
 </html>
